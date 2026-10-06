@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@source "../app";
+@source "../components";
+
+@theme {
+    --color-brand-50: #f4f0ff;
+    --color-brand-100: #e9e0ff;
+    --color-brand-200: #d5c4ff;
+    --color-brand-300: #b899ff;
+    --color-brand-400: #9966ff;
+    --color-brand-500: #8b5cf6;
+    --color-brand-600: #7c3aed;
+    --color-brand-700: #6d28d9;
+    --color-brand-800: #5b21b6;
+    --color-brand-900: #4c1d95;
+    --color-brand-darkbg: #090a0f;
+    --color-brand-darkcard: #121520;
+    --color-brand-darkborder: #1e2436;
+    --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+    --font-serif: "Playfair Display", Georgia, serif;
+}

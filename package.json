@@ -1,0 +1,33 @@
+{
+  "name": "whisperpost",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A privacy-conscious anonymous message relay with scheduled email delivery.",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "npm run build:css && next dev",
+    "build": "npm run build:css && next build && tsc -p tsconfig.worker.json",
+    "postbuild": "node scripts/prepare-standalone.mjs",
+    "start": "node .next/standalone/server.js",
+    "start:worker": "node --env-file=.env dist/worker/deliver-message.js",
+    "build:css": "tailwindcss -i ./styles/tailwind.css -o ./styles/generated.css --minify",
+    "test": "tsx --test tests/**/*.test.ts"
+  },
+  "dependencies": {
+    "next": "^16.3.8",
+    "nodemailer": "^10.0.14",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.3.0",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "tailwindcss": "4.3.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}
