@@ -11,7 +11,7 @@ export async function deliverOneDueMessage(
   const { transport, from } = options.mail ?? createMailConfiguration();
   if (!transport || !from) return false;
 
-  const row = store.claimDue();
+  const row = await store.claimDue();
   if (!row) return false;
 
   try {
@@ -19,7 +19,10 @@ export async function deliverOneDueMessage(
     const payload = decryptPayload(row, key);
     const token = createUnsubscribeToken(payload.recipient, key);
     const baseUrl = process.env.PUBLIC_BASE_URL || 'http://localhost:3000';
-    const unsubscribeUrl = `${baseUrl.replace(/\/$/, '')}/unsubscribe?t=${encodeURIComponent(token)}`;
+    const normalizedBaseUrl = baseUrl.replace(/\/$/, '');
+    const unsubscribeUrl = `${normalizedBaseUrl}/unsubscribe?t=${encodeURIComponent(token)}`;
+    const oneClickUnsubscribeUrl = `${normalizedBaseUrl}/api/unsubscribe?t=${encodeURIComponent(token)}`;
+    const messageIdDomain = new URL(baseUrl).hostname;
     const content = renderEmail(payload, unsubscribeUrl);
     await transport.sendMail({
       from,
@@ -27,14 +30,18 @@ export async function deliverOneDueMessage(
       subject: payload.subject,
       text: content.text,
       html: content.html,
-      messageId: `<${row.id}@whisperpost>`
+      messageId: `<${row.id}@${messageIdDomain}>`,
+      headers: {
+        'List-Unsubscribe': `<${oneClickUnsubscribeUrl}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+      }
     });
-    store.markSent(row.id, payload.deleteAfterDelivery);
+    await store.markSent(row.id, payload.deleteAfterDelivery);
   } catch (error) {
     const code = error instanceof Error && 'code' in error && typeof error.code === 'string'
       ? error.code.replace(/[^A-Z0-9_]/gi, '').slice(0, 30) || 'DELIVERY_ERROR'
       : 'DELIVERY_ERROR';
-    const retry = store.markRetry(row.id, row.attempts);
+    const retry = await store.markRetry(row.id, row.attempts);
     console.error(`Email delivery failed: id=${row.id} attempt=${row.attempts} code=${code} retry=${retry}`);
   }
 

@@ -10,7 +10,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   }
 
   try {
-    const message = getMessageStore().getStatus(id);
+    const message = await getMessageStore().getStatus(id);
     if (!message) return NextResponse.json({ error: 'Message was not found.' }, { status: 404 });
     return NextResponse.json({
       id,

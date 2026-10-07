@@ -1,6 +1,6 @@
 # WhisperPost
 
-WhisperPost is a small anonymous-message relay built with Next.js, TypeScript, SQLite, and SMTP. The interface is split into React components rather than kept in a monolithic HTML file. The web app accepts and encrypts messages; a separate worker sends due email and retries transient failures.
+WhisperPost is a small anonymous-message relay built with Next.js, TypeScript, libSQL/SQLite, and SMTP. The interface is split into React components rather than kept in a monolithic HTML file. The web app accepts and encrypts messages; a separate worker or scheduled Vercel function sends due email and retries transient failures.
 
 ## Project structure
 
@@ -14,7 +14,7 @@ app/                         Next.js App Router pages and API endpoints
 components/                  Composer, schedule, theme, preview, and dialogs
 lib/
   validation/                Request rules and shared types
-  db/                        SQLite store
+  db/                        Local SQLite / remote Turso store
   mail/                      SMTP configuration and escaped email template
   queue/                     Enqueue and delivery operations
   security/                  Encryption, rate limiting, and opt-out tokens
@@ -80,6 +80,23 @@ npm run build
 
 `npm run build` builds local Tailwind CSS, the standalone Next.js app, and the compiled delivery worker.
 
+## Deploy to Vercel
+
+Vercel hosts the Next.js app and invokes the delivery queue through `/api/cron/worker` once per minute, processing up to three messages per run. The cron endpoint is protected by `CRON_SECRET`. Vercel's Hobby plan only supports daily cron jobs; use Pro or Enterprise for the configured one-minute delivery checks.
+
+Before deploying, create a Turso database and an Upstash Redis database and have their connection values ready. The database schema is initialized automatically on first use. Vercel does not read the local `.env` file: add the environment variables below in the Vercel project's Settings → Environment Variables, then import the repository and deploy. Use the same `APP_ENCRYPTION_KEY` for every deployment and keep it stable; do not commit secrets or change this key while encrypted messages are queued.
+
+Set these variables for Production (and Preview if you intend to test sending there):
+
+- `APP_ENCRYPTION_KEY`
+- `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`
+- `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, and `SMTP_FROM`
+- `PUBLIC_BASE_URL` to the deployed HTTPS origin
+- `CRON_SECRET` to a long, random secret; Vercel sends it as the cron request's bearer token
+
+The normal Next.js build command is detected automatically. After deployment, verify `/api/health`, then submit a test message and check the Vercel function logs for cron processing. Use a verified SMTP sender. Messages already queued in a local SQLite database are not copied to Turso; deliver or migrate them before switching production traffic. The Docker Compose instructions below remain available for deployments that run the web app and worker together.
+
 ## Deploy with Docker Compose
 
 1. Copy `.env.example` to `.env`, generate a fresh `APP_ENCRYPTION_KEY`, and fill in the SMTP credentials and public HTTPS URL as above.
@@ -112,10 +129,12 @@ For deployments outside Compose, run the Next standalone server (`npm start`) an
 - Recipient, subject, body, category, and theme are encrypted in SQLite with AES-256-GCM while queued. The delivery worker decrypts them to send email through SMTP. Scheduled time and delivery state remain available to the queue and status API.
 - `/api/messages/[id]` returns only the opaque message ID, delivery state, and scheduled time—not the recipient or message content. Treat the random ID as a private status token.
 - SMTP delivery is best-effort. Transient failures are retried up to five times with backoff; provider acceptance does not guarantee inbox delivery. An SMTP timeout after provider acceptance can still result in a duplicate retry.
+- Inbox placement is controlled by recipient providers and cannot be guaranteed by the app. Use a verified sender address on a domain you control, publish the SPF and DKIM records supplied by your email provider, and publish a DMARC policy for that same domain. Set `SMTP_FROM` to the authenticated sender and `PUBLIC_BASE_URL` to the app's public HTTPS origin; use an email deliverability checker to confirm SPF, DKIM, and DMARC pass and align. Avoid sending bulk mail from a personal mailbox or a newly registered domain.
+- Sent emails include standard list-unsubscribe headers and a one-click unsubscribe endpoint. This helps recipients and mailbox providers manage unwanted mail; it does not itself prevent messages from being classified as spam.
 - `Delete our copy after delivery` deletes the app's encrypted copy when the SMTP server accepts the message. It cannot delete or recall email already delivered or retained by providers.
 - Successfully delivered records and old queued/failed records are pruned after 30 days. Opt-outs are retained as one-way SHA-256 hashes so future messages to an opted-out address can be rejected.
 - The app does not request sender identity or sender email and does not store sender IP addresses in the message database. The host, reverse proxy, and mail provider can still process or retain network and delivery metadata. **The app cannot guarantee sender anonymity.**
-- In-memory IP rate limiting allows five submissions per 15 minutes per observed address and resets on restart. It is a basic abuse measure, not a bot challenge or moderation system. Before public launch, add an abuse contact, configure provider bounce/complaint handling, and review applicable email and privacy rules.
+- Local development uses an in-memory IP rate limit of five submissions per 15 minutes per observed address; Vercel uses the shared Upstash Redis limiter. The local limiter resets on restart. This is a basic abuse measure, not a bot challenge or moderation system. Before public launch, add an abuse contact, configure provider bounce/complaint handling, and review applicable email and privacy rules.
 - No user accounts, sender inbox, AI moderation, view-once behavior, or guarantee of abuse prevention is included.
 
 ## Environment variables
@@ -129,5 +148,8 @@ For deployments outside Compose, run the Next standalone server (`npm start`) an
 | `SMTP_USER` / `SMTP_PASS` | Provider-dependent | Set both or neither |
 | `SMTP_FROM` | For sending | Verified sender address and optional display name |
 | `PUBLIC_BASE_URL` | Yes for opt-out links | Public origin, e.g. `https://whisperpost.example.com` |
-| `DATA_DIR` | No | SQLite directory; defaults to `./data` |
+| `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` | No locally; required on Vercel | Remote Turso database URL and authentication token. Without a URL, the app uses local SQLite-compatible storage in `DATA_DIR`. |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Required on Vercel | Upstash REST connection used for shared submission rate limits. |
+| `CRON_SECRET` | Required on Vercel | Secret bearer token protecting the scheduled delivery endpoint. |
+| `DATA_DIR` | No | Local SQLite-compatible data directory; defaults to `./data` |
 | `PORT` | No | Web port; defaults to `3000` |

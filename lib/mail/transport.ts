@@ -1,7 +1,15 @@
 import nodemailer from 'nodemailer';
 
 export interface MailTransport {
-  sendMail(message: { from: string; to: string; subject: string; text: string; html: string; messageId: string }): Promise<unknown>;
+  sendMail(message: {
+    from: string;
+    to: string;
+    subject: string;
+    text: string;
+    html: string;
+    messageId: string;
+    headers: Record<string, string>;
+  }): Promise<unknown>;
 }
 
 export interface MailConfiguration {

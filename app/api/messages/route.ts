@@ -15,8 +15,24 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     );
   }
+  if (process.env.VERCEL && !process.env.PUBLIC_BASE_URL) {
+    return NextResponse.json(
+      { error: 'The public application URL is not configured.' },
+      { status: 503 }
+    );
+  }
 
-  if (!allowMessageSubmission(request)) {
+  let allowed: boolean;
+  try {
+    allowed = await allowMessageSubmission(request);
+  } catch (error) {
+    console.error('Could not check submission rate limit:', error instanceof Error ? error.message : 'Unknown error');
+    return NextResponse.json(
+      { error: 'Message submission is temporarily unavailable.' },
+      { status: 503 }
+    );
+  }
+  if (!allowed) {
     return NextResponse.json(
       { error: 'Too many submissions. Please try again later.' },
       { status: 429, headers: { 'Retry-After': '900' } }
@@ -51,13 +67,13 @@ export async function POST(request: NextRequest) {
   try {
     const key = getEncryptionKey();
     const store = getMessageStore();
-    if (store.isBlocked(hashEmail(result.payload.recipient))) {
+    if (await store.isBlocked(hashEmail(result.payload.recipient))) {
       return NextResponse.json(
         { error: 'This recipient has opted out of future WhisperPost messages.' },
         { status: 403 }
       );
     }
-    const id = enqueueMessage(result.payload, result.scheduledAt);
+    const id = await enqueueMessage(result.payload, result.scheduledAt);
     return NextResponse.json({
       id,
       status: 'queued',

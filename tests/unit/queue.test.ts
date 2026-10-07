@@ -35,20 +35,29 @@ test('stores encrypted content, claims due items atomically, and deletes copy af
   const id = 'message-delivery-test';
   const encrypted = encryptPayload(payload, key, id);
   assert.deepEqual(decryptPayload({ id, ...encrypted }, key), payload);
-  store.enqueue(id, encrypted, Date.now(), true);
+  await store.enqueue(id, encrypted, Date.now(), true);
   const inspector = new DatabaseSync(databasePath);
   const queued = inspector.prepare('SELECT payload FROM messages WHERE id = ?').get(id) as { payload: Uint8Array };
   assert.equal(Buffer.from(queued.payload).includes(Buffer.from(payload.body)), false);
   inspector.close();
 
-  const sent: { to: string }[] = [];
+  process.env.PUBLIC_BASE_URL = 'https://whisperpost.example.test';
+  const sent: { to: string; messageId: string; headers: Record<string, string> }[] = [];
   const mail: MailConfiguration = {
     from: 'WhisperPost <relay@example.com>',
-    transport: { async sendMail(message) { sent.push({ to: message.to }); } }
+    transport: {
+      async sendMail(message) {
+        sent.push({ to: message.to, messageId: message.messageId, headers: message.headers });
+      }
+    }
   };
   assert.equal(await deliverOneDueMessage({ store, mail }), true);
-  assert.deepEqual(sent, [{ to: 'friend@example.com' }]);
-  assert.equal(store.getStatus(id)?.status, 'sent');
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, 'friend@example.com');
+  assert.match(sent[0].messageId, /^<message-delivery-test@whisperpost\.example\.test>$/);
+  assert.match(sent[0].headers['List-Unsubscribe'], /^<https:\/\/whisperpost\.example\.test\/api\/unsubscribe\?t=/);
+  assert.equal(sent[0].headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
+  assert.equal((await store.getStatus(id))?.status, 'sent');
   const afterDelivery = new DatabaseSync(databasePath);
   const delivered = afterDelivery.prepare('SELECT payload FROM messages WHERE id = ?').get(id) as { payload: null };
   assert.equal(delivered.payload, null);
@@ -57,13 +66,13 @@ test('stores encrypted content, claims due items atomically, and deletes copy af
 
 test('does not claim messages before their scheduled time and retries failed delivery', async () => {
   const futureId = 'message-future-test';
-  store.enqueue(futureId, encryptPayload(payload, key, futureId), Date.now() + 60_000, false);
-  assert.equal(store.claimDue(), null);
+  await store.enqueue(futureId, encryptPayload(payload, key, futureId), Date.now() + 60_000, false);
+  assert.equal(await store.claimDue(), null);
 
   const retryId = 'message-retry-test';
-  store.enqueue(retryId, encryptPayload(payload, key, retryId), Date.now(), false);
-  const row = store.claimDue();
+  await store.enqueue(retryId, encryptPayload(payload, key, retryId), Date.now(), false);
+  const row = await store.claimDue();
   assert.ok(row);
-  assert.equal(store.markRetry(retryId, 1), true);
-  assert.equal(store.getStatus(retryId)?.status, 'queued');
+  assert.equal(await store.markRetry(retryId, 1), true);
+  assert.equal((await store.getStatus(retryId))?.status, 'queued');
 });
