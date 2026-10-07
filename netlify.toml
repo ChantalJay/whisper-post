@@ -1,0 +1,4 @@
+[build.environment]
+  # These variables hold non-sensitive values (a public URL and a local data
+  # path) that legitimately appear in docs and code defaults.
+  SECRETS_SCAN_OMIT_KEYS = "PUBLIC_BASE_URL,DATA_DIR"
