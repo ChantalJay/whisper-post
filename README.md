@@ -67,6 +67,8 @@ compose.yaml                 Web app and delivery worker sharing a data volume
 
 6. Open [http://localhost:3000](http://localhost:3000). The health endpoint is `/api/health`.
 
+If you change `.env` after starting the app or worker, restart the affected process so it uses the updated settings.
+
 The UI and health endpoint run without SMTP, but the submission API returns an explicit `503` until delivery is configured. The worker requires a valid encryption key and SMTP configuration at startup.
 
 ## Test and production build

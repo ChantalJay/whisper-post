@@ -108,12 +108,17 @@ export function MessageComposer() {
             <h2>Compose a whisper</h2>
             <p>Write something thoughtful. The email relay does not ask for your name or email address.</p>
           </div>
-          <button className="text-button" onClick={reset} type="button">Reset</button>
+          <button aria-label="Reset message form" className="text-button" onClick={reset} type="button"><span aria-hidden="true">↺</span> Reset</button>
         </div>
 
-        <form className="composer-form" onSubmit={openPreview}>
+        <form
+          className="composer-form"
+          onChangeCapture={() => setError('')}
+          onInvalidCapture={() => setError('Please complete the required fields before reviewing your message.')}
+          onSubmit={openPreview}
+        >
           <label className="field-group">
-            <span className="field-label">Recipient email</span>
+            <span className="field-label">Recipient email <span className="required-mark">*</span></span>
             <input autoComplete="email" maxLength={254} onChange={(event) => setRecipient(event.target.value)} placeholder="friend@example.com" required type="email" value={recipient} />
           </label>
 
@@ -152,9 +157,10 @@ export function MessageComposer() {
 
           <label className="consent-row">
             <input checked={humanConfirmed} onChange={(event) => setHumanConfirmed(event.target.checked)} required type="checkbox" />
-            <span>I will use WhisperPost respectfully.</span>
+            <span>I will use WhisperPost respectfully. <span className="required-mark">Required</span></span>
           </label>
 
+          {error && <p className="form-error" role="alert">{error}</p>}
           <div className="form-actions">
             <button className="button-subtle" onClick={() => {
               const form = document.querySelector<HTMLFormElement>('.composer-form');
@@ -163,8 +169,9 @@ export function MessageComposer() {
                 setPreviewOpen(true);
               }
             }} type="button">Preview</button>
-            <button className="button-primary" type="submit">{scheduled ? 'Review scheduled message' : 'Review message'} <span aria-hidden="true">→</span></button>
+            <button className="button-primary" type="submit">{scheduled ? 'Review scheduled message' : 'Review before sending'} <span aria-hidden="true">→</span></button>
           </div>
+          <p className="field-note">Next, review your message and confirm to queue it for delivery.</p>
         </form>
       </section>
 

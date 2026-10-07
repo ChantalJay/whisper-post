@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { BrandMark } from '@/components/BrandMark';
 import { MessageComposer } from '@/components/MessageComposer';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
@@ -8,7 +9,7 @@ export default function HomePage() {
       <header className="site-header">
         <div className="header-inner">
           <Link className="brand-lockup" href="/">
-            <span aria-hidden="true" className="brand-mark">w</span>
+            <BrandMark />
             <span><strong>Whisper<span>Post</span></strong><small>ANONYMOUS MESSAGE RELAY</small></span>
           </Link>
           <nav aria-label="Main navigation" className="main-nav">
@@ -60,7 +61,7 @@ export default function HomePage() {
       </main>
 
       <footer className="site-footer">
-        <Link className="brand-lockup footer-brand" href="/"><span aria-hidden="true" className="brand-mark">w</span><span><strong>Whisper<span>Post</span></strong></span></Link>
+        <Link className="brand-lockup footer-brand" href="/"><BrandMark /><span><strong>Whisper<span>Post</span></strong></span></Link>
         <span>Anonymous email relay MVP. Delivery is best-effort; anonymity is not guaranteed.</span>
         <Link href="/privacy">Privacy</Link>
       </footer>

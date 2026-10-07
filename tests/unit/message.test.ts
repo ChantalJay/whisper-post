@@ -45,6 +45,29 @@ test('HTML email output escapes message content and includes an opt-out link', (
   assert.doesNotMatch(rendered.html, /<script>/);
   assert.match(rendered.html, /unsubscribe/);
   assert.match(rendered.html, /deletes its stored copy/);
+  assert.match(rendered.html, /role="presentation"/);
+  assert.match(rendered.html, /bgcolor="#171329"/);
+  assert.match(rendered.html, /A note, without a signature/);
+  assert.match(rendered.html, /W<span style="color:#ffd6f2;">P<\/span>/);
+});
+
+test('each email theme has a distinct, readable email-safe layout', () => {
+  const themes = ['midnight', 'neon', 'golden', 'minimal'] as const;
+  const html = themes.map((theme) => renderEmail({
+    recipient: 'friend@example.com',
+    subject: 'A note',
+    body: 'A kind message.',
+    category: 'Secret Confession 💌',
+    theme,
+    deleteAfterDelivery: false
+  }, 'https://example.com/unsubscribe?t=token').html);
+
+  assert.equal(new Set(html).size, themes.length);
+  for (const rendered of html) {
+    assert.match(rendered, /<table role="presentation"/);
+    assert.match(rendered, /A kind message\./);
+    assert.match(rendered, /href="https:\/\/example\.com\/unsubscribe\?t=token"/);
+  }
 });
 
 test('unsubscribe tokens are signed and recipient-specific', () => {
